@@ -1,0 +1,1368 @@
+### P1 ###
+
+# Taxa de câmbio (de 02/01/2012 até 06/08/2020)
+# DADOS DIÁRIOS
+
+CAMBIO = read_excel("Dados/D1 - E2 - USD_BRL Dados Históricos.xlsx")
+CAMBIO$Ano = str_sub(CAMBIO$Data,-4,-1)
+CAMBIO$Data = str_sub(CAMBIO$Data,1,-5)
+CAMBIO$Mês = str_sub(CAMBIO$Data,-2,-1)
+CAMBIO$Data = str_sub(CAMBIO$Data,1,-3)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("1","01",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("2","02",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("3","03",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("4","04",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("5","05",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("6","06",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("7","07",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("8","08",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Data = ifelse(nchar(CAMBIO$Data) == 1, gsub("9","09",CAMBIO$Data),CAMBIO$Data)
+CAMBIO$Dia = CAMBIO$Data
+CAMBIO$Data = with(CAMBIO,paste(Dia,Mês,Ano,sep = ","))
+CAMBIO$Data = as.Date(CAMBIO$Data,format = "%d,%m,%Y")
+CAMBIO$Dia = NULL
+CAMBIO$Mês = NULL
+CAMBIO$Ano = NULL
+
+CAMBIO$Abertura = ts(CAMBIO$Abertura)
+CAMBIO$Máxima = ts(CAMBIO$Máxima)
+CAMBIO$Mínima = ts(CAMBIO$Mínima)
+CAMBIO$`Var%` = ts(CAMBIO$`Var%`) # O cálculo dessa variação está esquisito
+CAMBIO$Último = ts(CAMBIO$Último)
+
+library(readxl)
+D1 <- read_excel("~/EESP/6? Semestre/Econometria II/Problemas/D1 - E2 - USD_BRL Dados Hist?ricos.xlsx")
+D1$subida <- D1$`Var%`>0
+D1$descida <- D1$`Var%`<0
+D1$`Var%` = ts(D1$`Var%`)
+
+library(ggplot2)
+library(ggfortify)
+# Gr?fico da s?rie temporal
+autoplot(D1$`Var%`) + ggtitle('S?rie Temporal') + xlab('Tempo') + ylab('Valores')
+library(forecast)
+# Gr?fico de autocorrela??o
+ggAcf(D1$`Var%`) + ggtitle('Autocorrela??o')
+# Gr?fico de autocorrela??o parcial
+ggPacf(D1$`Var%`) + ggtitle('Autocorrela??o Parcial')
+# Gr?fico da primeira diferen?a
+diffy = diff(D1$`Var%`)
+autoplot(diffy) + ggtitle('Primeira Diferen?a') + xlab('Tempo') + ylab('Valores')
+# Correlograma
+ggAcf(diffy) + ggtitle('Correlograma')
+# Correlograma parcial
+ggPacf(diffy)+ ggtitle('Correlograma')
+
+library(dynlm)
+# OLS explicado pelos 3 ?limos per?odos
+ols1 <- dynlm(D1$`Var%`~ L(D1$`Var%`)+L(D1$`Var%`,2)+L(D1$`Var%`,3), D1)
+summary(ols1)
+
+med.s <- mean(subset(D1$`Var%`, D1$subida == T))
+med.d <- mean(subset(D1$`Var%`, D1$descida == T))
+
+# teste-t
+(med.s - med.d)/sqrt(var(D1$`Var%`))
+qt(0.95,2243)
+
+### P2 ###
+
+library(readr)
+D3_E2 <- read_delim("~/EESP/6? Semestre/Econometria II/Problemas/D3 - E2.txt", 
+                    "\t", escape_double = FALSE, trim_ws = TRUE)
+
+D3_E2$value = ts(D3_E2$value)
+y <- D3_E2$value
+
+library(forecast)
+library(ggplot2)
+# Gr?fico da s?rie
+autoplot(y) + ggtitle('S?rie Temporal') + xlab('Tempo') + ylab('Valores') + theme_minimal()
+# Gr?fico da primeira diferen?a
+diffy <- diff(y)
+autoplot(diffy) + ggtitle('Primeira Diferen?a') + xlab('Tempo') + ylab('Valores') + theme_minimal()
+# Correlograma
+ggAcf(y) + ggtitle('Correlograma') + theme_minimal()
+# Correlograma parcial
+ggPacf(y)+ ggtitle('Correlograma Parcial') + theme_minimal()
+
+# Modelos AR(3), MA(2) e ARMA(3,2)
+AR3 <- arima(y, order = c(3,0,0))
+summary(AR3)
+BIC(AR3)
+AIC(AR3)
+library(lmtest)
+coeftest(AR3)
+autoplot(y) + ggtitle('AR3') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(AR3)) + theme_minimal()
+
+MA2 <- arima(y, order=c(0,0,2))
+summary(MA2)
+BIC(MA2)
+AIC(MA2)
+coeftest(MA2)
+autoplot(y) + ggtitle('MA2') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(MA2)) + theme_minimal()
+
+ARMA32 <- arima(y, order = c(3,0,2))
+summary(ARMA32)
+BIC(ARMA32)
+AIC(ARMA32)
+coeftest(ARMA32)
+autoplot(y) + ggtitle('ARMA32') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(ARMA32)) + theme_minimal()
+
+# Modelos AR(p), MA(q) e ARMA(p,q)
+p <- 2
+q <- 1
+
+ARp <- arima(y, order = c(p,0,0))
+summary(ARp)
+BIC(ARp)
+AIC(ARp)
+coeftest(ARp)
+# Teste t?
+tARp <- ARp$coef[1]/ARp$var.coef[1,1]
+tARp
+autoplot(y) + ggtitle('ARp') xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(ARp)) + theme_minimal()
+
+MAq <- arima(y, order=c(0,0,q))
+summary(MAq)
+BIC(MAq)
+AIC(MAq)
+coeftest(MAq)
+autoplot(y) + ggtitle('MAq') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(MAq)) + theme_minimal()
+
+ARMApq <- arima(y, order = c(p,0,q))
+summary(ARMApq)
+BIC(ARMApq)
+AIC(ARMApq)
+coeftest(ARMApq)
+autoplot(y) + ggtitle('ARMApq') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(ARMApq)) + theme_minimal()
+
+# Modelo auto ARMA (2,0,1)
+ARMAauto <- auto.arima(y)
+summary(ARMAauto)
+BIC(ARMAauto)
+AIC(ARMAauto)
+coeftest(ARMAauto)
+autoplot(y) + ggtitle('ARMAauto') + xlab('Tempo') + ylab('Valores') + autolayer(fitted.values(ARMAauto)) + theme_minimal()
+
+tabela <- matrix(c(BIC(AR3), AIC(AR3) ,BIC(MA2), AIC(MA2) ,BIC(ARMA32), AIC(ARMA32) ,BIC(ARp), AIC(ARp) ,BIC(MAq), AIC(MAq) ,BIC(ARMApq), AIC(ARMApq), BIC(ARMAauto), AIC(ARMAauto)),ncol=2,byrow=TRUE)
+colnames(tabela) <- c("BIC","AIC")
+rownames(tabela) <- c("AR3","MA2","ARMA32","ARp","MAq", "ARMApq", "ARMAauto" )
+tabela <- as.table(tabela)
+tabela
+
+autoplot(resid(ARMAauto)) + ggtitle('S?rie Temporal') + xlab('Tempo') + ylab('Valores') + theme_minimal()
+ggAcf(resid(ARMAauto)) + ggtitle('Correlograma') + theme_minimal()
+#Correlograma parcial
+ggPacf(resid(ARMAauto))+ ggtitle('Correlograma Parcial') + theme_minimal()
+
+### P4 ###
+
+library(readxl)
+D4_E2 <- read_excel("~/EESP/6º Semestre/Econometria II/Problemas/D4 - E2.xlsx")
+
+names(D4_E2) = c('t','val')
+D4_E2$t = NULL #pra q excluir essa coluna?
+D4_E2 <- ts(D4_E2$val)
+y <- D4_E2$val
+h <- 4
+
+# 1 - Separar entre treinamento e teste
+frac <- 0.2
+T <- length (y)
+k <- floor((1-frac)*T) #número de obs na base de treinamento
+
+# 2 - Estimar o modelo na base de treinamento
+fit <- arima(y[1:k], order = c(2,0,2))
+
+# 3 - Prever o valor no período k+h
+pred <- predict(fit, n.ahead = h)
+
+# 4 - Computar o erro associado à previsão do valor no período k+h
+erro <- y[(k+h)]-pred$pred[h] 
+
+# Estimar por ARMA na base de treinamento com k+1 obs
+fit <- arima(y[1:k+1], order = c(2,0,2))
+pred <- predict(fit, n.ahead = h)
+erro = y[(k+1+h)]-pred$pred[h]
+
+# Matriz para guardar todos os erros de previsão
+erro = matrix(NA,100) #note que 'erro' tem tamanho T mas só T-h-k+1 valores
+
+# CV
+for (t in k:(T-h)){
+  fit <- arima(y[1:t], order = c(2,0,2))
+  pred <- predict(fit, n.ahead = h)
+  erro[t,1] <- y[(t+h)]-pred$pred[h]
+}
+
+# Erro quadrático médio
+eqm <- round(mean(erro^2, na.rm=TRUE),digits=4)
+eqm
+
+## Eqm para a previsão de vários ARMA(p,q) com 80% treino 20% teste
+
+resultado <-matrix(NA,nrow = 4,ncol = 4)
+
+
+for (p in 1:4) 
+{ 
+  for (q in 1:4) 
+  {
+    
+    M_erro<-matrix(NA,nrow = 100)
+    for (t in k:(T-h)) 
+    {  fit = arima(y[1:(t)], order = c(p,0,q))
+    pred = predict(fit,n.ahead = h)
+    M_erro[t] = y[(t+h)]-pred$pred[h]
+    resultado[p,q]<-mean(M_erro^2, na.rm=TRUE)
+    }
+  }
+}
+print(resultado)
+which(resultado == min(resultado), T)
+
+# 1- Estimar o modelo 
+ARMA11 <- arima(y, order=c(1,0,1))
+phi1.h <- ARMA11$coef[1]
+theta1.h <- ARMA11$coef[2]
+c.h <- ARMA11$coef[3]
+
+# 2 - Computar o resíduo centrado
+e.c <- resid(ARMA11) - mean(resid(ARMA11))
+
+# 3 - Selecionando T+m elementos da série de resíduos centrados
+m <- 50
+e.s <- sample(e.c,T+m,T)
+
+# 4 - Obter a série y.s
+y.s<-matrix(NA,length(e.s))
+y.s<-ts(y.s)
+arima.sim(ARMA11, h, innov=e.s) #
+for(i in 1:length(e.s))
+{  
+  if(i==1) {y.s[i]=y[i]} 
+  else{ y.s[i]= c.h + phi1.h*y.s[i-1] + theta1.h*e.s[i-1] + e.s[i] }
+  
+}
+y.s<-y.s[(m+1):(T+m)]
+
+### P5 ###
+
+D5 <- read_delim("~/EESP/6º Semestre/Econometria II/Problemas/D5 - E2 (4).csv", ";", escape_double = FALSE, col_types = cols(PIB = col_number(), ano = col_number(), trimestre = col_number()), trim_ws = TRUE)
+D5$PIB<-ts(D5$PIB, frequency = 4)
+PIB<-ts(D5$PIB, start = c(1996,1), end = c(2020,1), frequency = 4)
+
+library(ggplot2)
+autoplot(PIB) + ggtitle("PIB") + xlab("Tempo") + ylab("PIB") + theme_classic()
+acf(PIB, lag.max = 50)
+pacf(PIB,lag.max = 50)
+
+# Tendência Linear
+D5$trend<- 1:nrow(D5)
+D5$trend_2<-D5$trend*D5$trend
+tendencia<- lm(data=D5,PIB~trend)
+summary(tendencia)
+PIB_detrend<-ts(residuals(tendencia), start = c(1996,1), end = c(2020,1), frequency = 4)
+D5$detrend<-PIB_detrend
+
+autoplot(PIB_detrend) + ggtitle("PIB detrend") + xlab("Tempo") + ylab("PIB") + theme_classic()
+acf(PIB_detrend,lag.max = 50)
+pacf(PIB_detrend,lag.max = 50)
+
+# Sazonalidade
+D5$trimestre<-rep(c("pri","seg","ter","qua"),25)[1:nrow(D5)]
+sazonal_trend<-lm(data=D5,detrend~factor(trimestre))
+summary(sazonal_trend)
+
+PIB_detrend_dessazonal<-ts(residuals(sazonal_trend), start = c(1996,1), end = c(2020,1), frequency = 4)
+autoplot(PIB_detrend_dessazonal) + ggtitle("PIB detrend dessaz") + xlab("Tempo") + ylab("PIB") + theme_classic()
+acf(PIB_detrend_dessazonal, lag.max = 50)
+pacf(PIB_detrend_dessazonal, lag.max = 50)
+
+# Filtro Hodrick Prescott
+library(mFilter)
+hp <- hpfilter(PIB)
+PIB_hp <- hp$cycle
+D5$cycle <- PIB_hp
+
+autoplot(hp$trend) + ggtitle("HP tendência") + xlab("Tempo") + ylab("PIB") + theme_classic()
+autoplot(PIB_hp) + ggtitle("HP ciclo") + xlab("Tempo") + ylab("PIB") + theme_classic()
+acf(PIB_hp,lag.max = 50)
+pacf(PIB_hp,lag.max = 50)
+
+sazonal_hp<-lm(data=D5,cycle~trimestre)
+summary(sazonal_hp)
+
+PIB_hp_dessaz<-ts(residuals(sazonal_hp),frequency = 4)
+autoplot(PIB_hp_dessaz)+ ggtitle("PIB dessaz HP") + xlab("Tempo") + ylab("PIB") + theme_classic()
+acf(PIB_hp_dessaz)
+pacf(PIB_hp_dessaz)
+
+# Desocupação
+library(readxl)
+D5_E2_5_ <- read_excel("~/EESP/6º Semestre/Econometria II/Problemas/D5 - E2 (5).xlsx")
+D5_E2_5_$desocupacao <- ts(D5_E2_5_$Total, start = c(2002,3), end = c(2016,2),frequency = 12)
+desocupacao <- D5_E2_5_$desocupacao
+desocupacao <- gsub(pattern = ",", replacement = ".", desocupacao)
+D5_E2_5_$desocupacao <- desocupacao
+
+autoplot(desocupacao)+ ggtitle("Taxa de desocupação") + xlab("Tempo") + ylab("Taxa de desocupação") + theme_classic()
+
+hp_desocupacao <- hpfilter(desocupacao,30000)
+D5_E2_5_$cycle <- hp_desocupacao$cycle
+autoplot(hp_desocupacao$trend)
+autoplot(hp_desocupacao$cycle)
+acf(hp_desocupacao$cycle, lag.max = 50)
+
+### P6 ###
+
+library(ggfortify) #em que momento esse pacote foi usado?
+
+# Sem drift
+
+T = 100
+S = 10000
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e = rnorm(T,0,1)
+
+# Passo 2: criar passeio aleat?rio
+y = cumsum(e)
+y = as.ts(y)
+library(ggplot2)
+autoplot(y) + ggtitle('S?rie Simulada') + xlab('Tempo') + ylab('Valores')
+y_diff = diff(y)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg = summary(dynlm(y_diff ~ 0 + L(y,1)))
+reg
+reg$coefficients[1,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S vezes
+resultados = integer(S) #o q esse integer() ta fazendo?
+
+for (i in 1:S){
+  e = rnorm(T,0,1)
+  y = cumsum(e)
+  y = as.ts(y)
+  
+  y_diff = diff(y)
+  
+  reg = summary(dynlm(y_diff ~ 0 + L(y,1)))
+  
+  resultados[i] = reg$coefficients[1,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df = as.data.frame(resultados)
+names(resultados.df)="res"
+ggplot(data = resultados.df, aes(x = res)) + ggtitle('Sem drift') + geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados) #H0 ? q ? distribu?do como normal?
+val_crit = quantile(resultados, c(0.01,0.05,0.1))
+val_crit
+
+
+# Tamanho da amostra 
+
+T_t = 150
+S_t = 10000
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e_t = rnorm(T_t,0,1)
+
+# Passo 2: criar passeio aleat?rio
+y_t = cumsum(e_t)
+y_t = as.ts(y_t)
+library(ggplot2)
+autoplot(y_t) + ggtitle('S?rie Simulada_t') + xlab('Tempo') + ylab('Valores')
+y_diff_t = diff(y_t)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg_t = summary(dynlm(y_diff_t ~ 0 + L(y_t,1)))
+reg_t
+reg_t$coefficients[1,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S vezes
+resultados_t = integer(S_t) #o q esse integer() ta fazendo?
+
+for (i in 1:S_t){
+  e_t = rnorm(T_t,0,1)
+  y_t = cumsum(e_t)
+  y_t = as.ts(y_t)
+  
+  y_diff_t = diff(y_t)
+  
+  reg_t = summary(dynlm(y_diff_t ~ 0 + L(y_t,1)))
+  
+  resultados_t[i] = reg_t$coefficients[1,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df_t = as.data.frame(resultados_t)
+names(resultados.df_t)="res_t"
+ggplot(data = resultados.df_t, aes(x = res_t)) +ggtitle('Tamanho da amostra') +  geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados_t) #H0 ? q ? distribu?do como normal?
+val_crit_t = quantile(resultados_t, c(0.01,0.05,0.1))
+val_crit_t
+
+# Com drift 
+
+T_cte = 100
+S_cte = 10000
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e_cte = rnorm(T_cte,0,1)
+
+# Passo 2: criar passeio aleat?rio
+y_cte = vector()
+y_cte[1] = 0 
+for(i in 1:(T_cte-1)){
+  y_cte[i+1] = y_cte[i] + e_cte[i+1]
+}
+y_cte = as.ts(y)
+library(ggplot2)
+autoplot(y_cte) + ggtitle('S?rie Simulada_cte') + xlab('Tempo') + ylab('Valores')
+y_diff_cte = diff(y)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg_cte = summary(dynlm(y_diff_cte ~ L(y_cte,1)))
+reg_cte
+reg_cte$coefficients[2,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S_cte vezes
+resultados_cte = integer(S_cte) #o q esse integer() ta fazendo?
+
+for (i in 1:S_cte){
+  e_cte = rnorm(T_cte,0,1)
+  y_cte = cumsum(e_cte)
+  y_cte = as.ts(y_cte)
+  
+  y_diff_cte = diff(y_cte)
+  
+  reg_cte = summary(dynlm(y_diff_cte ~ L(y_cte,1)))
+  
+  resultados_cte[i] = reg_cte$coefficients[2,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df_cte = as.data.frame(resultados_cte)
+names(resultados.df_cte)="res_cte"
+ggplot(data = resultados.df_cte, aes(x = resultados_cte)) +  geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados_cte) #H0 ? q ? distribu?do como normal?
+val_crit_cte = quantile(resultados_cte, c(0.01,0.05,0.1))
+val_crit_cte
+
+
+# Com drift e tend?ncia linear 
+D5$trend<- 1:nrow(D5)
+T_c_t = 100
+S_c_t = 10000
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e_c_t = rnorm(T,0,1)
+
+# Passo 2: criar passeio aleat?rio
+y_c_t = cumsum(e_c_t)
+y_c_t = as.ts(y_c_t)
+library(ggplot2)
+autoplot(y_c_t) + ggtitle('S?rie Simulada_c_t') + xlab('Tempo') + ylab('Valores')
+y_diff_c_t = diff(y_c_t)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg_c_t = summary(dynlm(y_diff_c_t ~ trend + L(y_c_t,1)))
+reg_c_t
+reg_c_t$coefficients[1,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S_c_t vezes
+resultados_c_t = integer(S_c_t) #o q esse integer() ta fazendo?
+
+for (i in 1:S_c_t){
+  e_c_t = rnorm(T_c_t,0,1)
+  y_c_t = cumsum(e_c_t)
+  y_c_t = as.ts(y_c_t)
+  
+  y_diff_c_t = diff(y_c_t)
+  
+  reg_c_t = summary(dynlm(y_diff_c_t ~ trend + L(y_c_t,1)))
+  
+  resultados_c_t[i] = reg_c_t$coefficients[1,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df_c_t = as.data.frame(resultados_c_t)
+names(resultados.df_c_t)="res_c_t"
+ggplot(data = resultados.df_c_t, aes(x = res_c_t)) + ggtitle('Com drift e tend?ncia linear') + geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados_c_t) #H0 ? q ? distribu?do como normal?
+val_crit_c_t = quantile(resultados_c_t, c(0.01,0.05,0.1))
+val_crit_c_t
+
+# Estrutura de autocorrela??o dos erros 
+T_a = 100
+S_a = 10000
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e_a = diffinv(rnorm(T_a,0,1))
+
+# Passo 2: criar passeio aleat?rio
+y_a = cumsum(e_a)
+y_a = as.ts(y_a)
+library(ggplot2)
+autoplot(y_a) + ggtitle('S?rie Simulada_a') + xlab('Tempo') + ylab('Valores')
+y_diff_a = diff(y_a)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg_a = summary(dynlm(y_diff_a ~ 0 + L(y_a,1)))
+reg_a
+reg_a$coefficients[1,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S vezes
+resultados_a = integer(S_a) #o q esse integer() ta fazendo?
+
+for (i in 1:S_a){
+  e_a = diffinv(rnorm(T_a,0,1))
+  y_a = cumsum(e_a)
+  y_a = as.ts(y_a)
+  
+  y_diff_a = diff(y_a)
+  
+  reg_a = summary(dynlm(y_diff_a ~ 0 + L(y_a,1)))
+  
+  resultados_a[i] = reg_a$coefficients[1,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df_a = as.data.frame(resultados_a)
+names(resultados.df_a)="res_a"
+ggplot(data = resultados.df_a, aes(x = res_a)) + ggtitle('Com correla??o serial') + geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados_a) #H0 ? q ? distribu?do como normal?
+val_crit_a = quantile(resultados_a, c(0.01,0.05,0.1))
+val_crit_a
+
+# Distribui??o dos erros
+
+T_e = 100
+S_e = 10000
+gl = 5
+
+# Passo 1: criar vetor de erros
+set.seed(123)
+e_e = rt(T_e,gl)
+
+# Passo 2: criar passeio aleat?rio
+y_e = cumsum(e_e)
+y_e = as.ts(y_e)
+library(ggplot2)
+autoplot(y_e) + ggtitle('S?rie Simulada_e') + xlab('Tempo') + ylab('Valores')
+y_diff_e = diff(y_e)
+
+# Passo 3: estimar modelo sob H1
+library(dynlm)
+reg_e = summary(dynlm(y_diff_e ~ 0 + L(y_e,1)))
+reg_e
+reg_e$coefficients[1,3] #estat?stica t
+
+# Passo 4: repetir passos 1-3 S_e vezes
+resultados_e = integer(S_e) #o q esse integer() ta fazendo?
+
+for (i in 1:S_e){
+  e_e = rt(T_e,gl)
+  y_e = cumsum(e_e)
+  y_e = as.ts(y_e)
+  
+  y_diff_e = diff(y_e)
+  
+  reg_e = summary(dynlm(y_diff_e ~ 0 + L(y_e,1)))
+  
+  resultados_e[i] = reg_e$coefficients[1,3]
+}
+# ggplot n?o aceita dados em vetores num?ricos, logo, temos que converter o vetor resultados em um data frame
+resultados.df_e = as.data.frame(resultados_e)
+names(resultados.df_e)="res_e"
+ggplot(data = resultados.df_e, aes(x = res_e)) + ggtitle('Erros ~ t(gl)') geom_density(color='blue') + xlab('Estatistica de teste') + ylab('Densidade') + stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) #densidade da normal
+library(tseries)
+jarque.bera.test(resultados_e) #H0 ? q ? distribu?do como normal?
+val_crit_e = quantile(resultados_e, c(0.01,0.05,0.1))
+val_crit_e
+
+
+# Parte 3
+
+library(readxl)
+D5 <- read_excel("EESP/6? Semestre/Econometria II/Problemas/D5 - E2.xlsx")
+D5$PIB<-ts(D5$PIB, frequency = 4)
+PIB<-ts(D5$PIB, start = c(1996,1), end = c(2020,1), frequency = 4)
+
+plot(PIB)
+acf(PIB, lag.max = 50)
+pacf(PIB,lag.max = 50)
+
+### P7 ###
+
+d7 = read.csv("US_GDP.csv")
+
+y = c(0)
+for(i in 2:nrow(d7))
+{y[i] = d7$NA000334Q[i]/d7$NA000334Q[i-1] - 1}
+d7$crescimento = y
+names(d7)<-c("data","valor","crescimento")
+d7 = d7[13:236,]
+y = ts(d7$crescimento,frequency = 4, start=c(1950,1), end = c(2005,4))
+
+library(ggplot2)
+library(ggfortify)
+autoplot(y) + ggtitle('SÃ©rie') + xlab('Tempo') + ylab('GDP') + theme_minimal()
+library(forecast)
+ggAcf(y, lag.max = 25) + ggtitle('Correlograma') + xlab('Lags') + ylab('ACF') + theme_minimal()
+ggPacf(y, lag.max = 25) + ggtitle('Correlograma Parcial') + xlab('Lags') + ylab('PACF') + theme_minimal()
+
+
+
+library(gap)
+library(strucchange)
+chow.test()
+sctest()
+
+arimaorder(auto.arima(y, seasonal = F))
+
+# Testando quebra estrutural por dummy
+d7$obs = 1:length(d7$crescimento)
+pos.quebra = ifelse(d7$obs > 150, 1, 0)
+# Na constante
+summary(lm(y ~ pos.quebra))
+# Na constante e na inclinaÃ§Ã£o
+library(dynlm)
+summary(dynlm(y ~ pos.quebra + lag(y) + pos.quebra*lag(y)))
+
+quebra = 150
+arima = arima(y, c(1,0,0))
+arima.pre = arima(y[1:quebra], c(1,0,0))
+arima.pos = arima(y[(quebra+1):length(y)], c(1,0,0))
+ssr = sum(resid(arima)^2)
+ssr.pre = sum(resid(arima.pre)^2)
+ssr.pos = sum(resid(arima.pos)^2)
+
+chow = function(Ssr, Ssr1, Ssr2, Size, N){
+  ((Ssr - Ssr1 - Ssr2)/N)/((Ssr1 + Ssr2)/(Size - 2*N))
+}
+
+chow(Ssr = ssr, Ssr1 = ssr.pre, Ssr2 = ssr.pos, Size = length(y), N = 2)
+
+# chow ~ F(n, T-2n)
+significancia = 0.05
+qf(1-significancia, 2, length(y)-2)
+if(chow(Ssr = ssr, Ssr1 = ssr.pre, Ssr2 = ssr.pos, Size = 224, N = 2) >= qf(1-significancia, 2, length(y)-2)){
+  print("Rejeitamos H0, ou seja, hÃ¡ quebra estrutural")
+}else {print("NÃ£o rejeitamos H0, ou seja, nÃ£o podemos afirmar que hÃ¡ quebra estrutural")}
+
+chows = c(0)
+for(j in 1:50){
+  arima = arima(y, c(1,0,0))
+  arima.pre = arima(y[1:(quebra+j)], c(1,0,0))
+  arima.pos = arima(y[(quebra+j+1):length(y)], c(1,0,0))
+  
+  ssr = sum(resid(arima)^2)
+  ssr.pre = sum(resid(arima.pre)^2)
+  ssr.pos = sum(resid(arima.pos)^2)
+  
+  chows[j] = chow(Ssr = ssr, Ssr1 = ssr.pre, Ssr2 = ssr.pos, Size = length(y), N = 2)
+  
+}
+
+teste = ifelse(chows > qf(1-significancia, 2, length(y)-2), 1, 0)
+sum(teste)
+
+which.max(chows)
+
+### P8 ###
+
+# BASES #
+
+# VALE3
+library(readr)
+VALE3 = read_csv("VALE3.csv",locale = locale(decimal_mark = ","))
+VALE3$Data = as.Date(VALE3$Data, format = "%d.%m.%Y")
+datas <- VALE3$Data
+
+VALE3$Ãltimo = ts(VALE3$Ãltimo)
+VALE3$Abertura = ts(VALE3$Abertura)
+
+vale3 = VALE3$Ãltimo
+r_vale <- log(vale3/lag(vale3))
+
+
+library(ggplot2)
+library(ggfortify)
+autoplot(vale3) + ggtitle('VALE3') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+library(forecast)
+ggAcf(vale3) + ggtitle("VALE3 FAC") + theme_minimal()
+ggPacf(vale3) + ggtitle("VALE3 FACP") + theme_minimal()
+ggAcf(vale3^2) + ggtitle("VALE3^2 FAC") + theme_minimal()
+
+# PETR3
+PETR3 = read_csv("PETR3.csv",locale = locale(decimal_mark = ","))
+PETR3$Data = as.Date(PETR3$Data, format = "%d.%m.%Y")
+PETR3$Ãltimo = ts(PETR3$Ãltimo)
+PETR3$Abertura = ts(PETR3$Abertura)
+
+petr3 = PETR3$Ãltimo
+r_petr <- log(petr3/lag(petr3,1))
+
+
+autoplot(petr3) + ggtitle('PETR3') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(petr3) + ggtitle("PETR3 FAC") + theme_minimal()
+ggPacf(petr3) + ggtitle("PETR3 FACP") + theme_minimal()
+
+# MRVE3
+MRVE3 = read_csv("MRVE3.csv",locale = locale(decimal_mark = ","))
+MRVE3$Data = as.Date(MRVE3$Data, format = "%d.%m.%Y")
+MRVE3$Ãltimo = ts(MRVE3$Ãltimo)
+MRVE3$Abertura = ts(MRVE3$Abertura)
+
+mrve3 = MRVE3$Ãltimo
+r_mrv <- log(mrve3/lag(mrve3,1))
+
+autoplot(mrve3) + ggtitle('MRVE3') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(mrve3) + ggtitle("MRVE3 FAC") + theme_minimal()
+ggPacf(mrve3) + ggtitle("MRVE3 FACP") + theme_minimal()
+
+# BBAS3
+BBAS3 = read_csv("BBAS3.csv",locale = locale(decimal_mark = ","))
+BBAS3$Data = as.Date(BBAS3$Data, format = "%d.%m.%Y")
+BBAS3$Ãltimo = ts(BBAS3$Ãltimo)
+BBAS3$Abertura = ts(BBAS3$Abertura)
+
+bbas3 = BBAS3$Ãltimo
+r_bbas <- log(bbas3/lag(bbas3,1))
+
+autoplot(bbas3) + ggtitle('BBAS3') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(bbas3) + ggtitle("BBAS3 FAC") + theme_minimal()
+ggPacf(bbas3) + ggtitle("BBAS3 FACP") + theme_minimal()
+
+# ABEV3
+ABEV3 = read_csv("ABEV3.csv",locale = locale(decimal_mark = ","))
+ABEV3$Data = as.Date(ABEV3$Data, format = "%d.%m.%Y")
+ABEV3$Ãltimo = ts(ABEV3$Ãltimo)
+ABEV3$Abertura = ts(ABEV3$Abertura)
+
+abev3 = ABEV3$Ãltimo
+r_abev <- log(abev3/lag(abev3,1))
+
+autoplot(abev3) + ggtitle('ABEV3') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(abev3) + ggtitle("ABEV3 FAC") + theme_minimal()
+ggPacf(abev3) + ggtitle("ABEV3 FACP") + theme_minimal()
+
+# BOVA11
+BOVA11 = read_csv("BOVA11.csv",locale = locale(decimal_mark = ","))
+BOVA11$Data = as.Date(BOVA11$Data, format = "%d.%m.%Y")
+BOVA11$Ãltimo = ts(BOVA11$Ãltimo)
+BOVA11$Abertura = ts(BOVA11$Abertura)
+
+bova11 = BOVA11$Ãltimo
+r_bova <- log(bova11/lag(bova11,1))
+
+autoplot(bova11) + ggtitle('BOVA11') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(bova11) + ggtitle("BOVA11 FAC") + theme_minimal()
+ggPacf(bova11) + ggtitle("BOVA11 FACP") + theme_minimal()
+
+# D8
+D8 <- data.frame(data = datas, 
+                 ambev = abev3,
+                 b.brasil = bbas3,
+                 ibovespa = bova11,
+                 mrv = mrve3,
+                 petro = petr3,
+                 vale = vale3)
+matplot(D8[,-1], type = "l", ylab = "PreÃ§o", xlab = "Tempo")
+legend("topright", colnames(D8[,-1]), col=1:6, cex=0.6, fill=1:6)
+
+# D8_R
+D8_R <- D8[2:2661,] # Excluindo a linha perdida
+D8_R$R_VALE <- r_vale # Log retorno
+D8_R$R_PETR <- r_petr
+D8_R$R_MRV <- r_mrv
+D8_R$R_BBAS <- r_bbas
+D8_R$R_ABEV <- r_abev
+D8_R$R_BOVA <- r_bova
+
+D8_R$RP_VALE <- (r_vale - mean(r_vale))/sd(r_vale) # Log retorno normalizado
+D8_R$RP_PETR <- (r_petr - mean(r_petr))/sd(r_petr)
+D8_R$RP_MRV <- (r_mrv - mean(r_mrv))/sd(r_mrv)
+D8_R$RP_BBAS <- (r_bbas - mean(r_bbas))/sd(r_bbas)
+D8_R$RP_ABEV <- (r_abev - mean(r_abev))/sd(r_abev)
+D8_R$RP_BOVA <- (r_bova - mean(r_bova))/sd(r_bova)
+
+matplot(D8_R[,8:13], type = "l", ylab = "Retorno", xlab = "Tempo")
+legend("topright", colnames(D8_R[,8:13]), col=1:6, cex=0.6, fill=1:6)
+
+# Fato 1: Independencia em media entre retorno em t e historico de retornos ate t-1
+
+# VALE3
+auto_arima_vale <- auto.arima(r_vale)
+arimaorder(auto_arima_vale)
+
+p_vale_arima <- 3
+d_vale_arima <- 2
+q_vale_arima <- 3
+
+arima_pdq_vale <- arima(r_vale,c(p_vale,d_vale,q_vale))
+AIC(arima_pdq_vale)
+BIC(arima_pdq_vale)
+
+library(dynlm)
+dynlm_vale <- dynlm(r_vale ~ lag(r_vale,1) + lag(r_vale,2) + lag(r_vale,3) +
+                      (lag(r_vale,1))^2 + (lag(r_vale,2))^2 + (lag(r_vale,3))^2 + 
+                      (lag(r_vale,1))^3 + (lag(r_vale,2))^3 + (lag(r_vale,3))^3)
+summary(dynlm_vale)
+
+library(lmtest)
+# ???
+teste_vale <- resettest(r_vale ~ lag(r_vale,1) + lag(r_vale,2) + lag(r_vale,3), lag(r_vale,4), lag(r_vale,5),
+                        power = 3, type="regressor")
+
+autoplot(r_vale) + ggtitle('R_VALE') + xlab('Tempo') + ylab('PreÃ§o') + theme_minimal()
+ggAcf(vale3) + ggtitle("R_VALE FAC") + theme_minimal()
+ggPacf(vale3) + ggtitle("R_VALE FACP") + theme_minimal()
+
+# PETR3
+
+# MRVE3
+
+# BBAS3
+
+# ABEV3
+
+# BOVA11 #
+
+
+# Fato 2: Esperanca do retorno positiva 
+# Se o coeficiente estimado > 0 e significante, vale o Fato 2
+
+### VALE3 ###
+lm_vale <- lm(r_vale ~ 1)
+summary(lm_vale) 
+t.test()
+### PETR3 ###
+lm_petr <- lm(r_petr ~ 1)
+summary(lm_petr)
+
+### MRVE3 ###
+lm_mrv <- lm(r_mrv ~ 1)
+summary(lm_mrv)
+
+### BBAS3 ###
+lm_bbas <- lm(r_bbas ~ 1)
+summary(lm_bbas)
+
+### ABEV3 ### 
+lm_abev <- lm(r_abev ~ 1)
+summary(lm_abev)
+
+### BOVA11 ###
+lm_bova <- lm(r_bova ~ 1)
+summary(lm_bova)
+
+# Fato 3: Retornos leptocurticos 
+# D8_R_M
+library(reshape2)
+D8_R_M <- melt(D8_R[,14:19])
+
+ggplot(D8_R_M,aes(x=value,colour=variable)) + geom_density() + 
+  xlim(-4,4) + stat_function(fun = dnorm,colour="black") + 
+  ggtitle("DistribuiÃ§Ã£o empÃ­rica dos retornos") + xlab("Retornos normalizados") + ylab("Densidade") + theme_minimal()
+
+xkurtosis <- function(rt){
+  mean(((rt-mean(rt))/sd(rt))^4) - 3
+}
+
+library(moments)
+kurtosis(r_vale)
+xkurtosis(r_vale)
+
+# Estimador para o excesso de curtose
+G2 <- function(rt){
+  (length(rt)-1)*((length(rt)-1)*xkurtosis(r_vale)+6)/((length(rt)-2)*(length(rt)-3))
+}
+
+### VALE3 ###
+G2_vale <- G2(r_vale)
+ifelse(G2_vale > qnorm(0.025,0,sqrt(24), lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+### PETR3 ###
+G2_petr <- G2(r_petr)
+ifelse(G2_petr > qnorm(0.025,0,sqrt(24), lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+### MRVE3 ###
+G2_mrv <- G2(r_mrv)
+ifelse(G2_mrv > qnorm(0.025,0,sqrt(24), lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+### BBAS3 ###
+G2_bbas <- G2(r_bbas)
+ifelse(G2_bbas > qnorm(0.025,0,sqrt(24), lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+### ABEV3 ###
+G2_abev <- G2(r_abev)
+ifelse(G2_abev > qnorm(0.05,0,sqrt(24), lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+### BOVA11 ###
+G2_bova <- G2(r_bova)
+ifelse(G2_bova > qnorm(0.05,0,sqrt(24),lower.tail = F),"Excesso de curtose","Nao ha excesso de kurtose estatisticamente significante")
+
+
+# Fato 4: Clustering da volatilidade 
+### VALE3 ###
+library(fGarch)
+garch_vale <- garchFit(~garch (1,1), r_vale, trace=F, include.mean = FALSE)
+garch_vale@fit$matcoef
+
+library(rugarch)
+garch_vale_spec <- ugarchspec(mean.model = list(armaOrder = c(arimaorder(auto.arima(r_vale))[1],arimaorder(auto.arima(r_vale))[3]),
+                                                include.mean = F,
+                                                variance.model = list(model = 'sGARCH',
+                                                                      garchOrder = c(1,1),
+                                                                      external.regressors = as.matrix(D8_R$SEG)),
+                                                distribution = "norm"))
+garch_vale_seg <- ugarchfit(data = r_vale, spec = garch_vale_spec)                     
+garch_vale_seg@fit$robust.matcoef
+
+### PETR3 ###
+
+### MRVE3 ###
+
+### BBAS3 ###
+
+### ABEV3 ###
+
+### BOVA11 ###
+
+# Fato 5: Volatilidade condicional maior durante os primeiros dias da semana 
+# Dummy para segundas-feiras
+D8_R$SEG <- ifelse(weekdays(D8_R$data) == "segunda-feira",1,0)
+
+### VALE3 ###
+tgarch_vale_spec <- ugarchspec(mean.model = list(armaOrder = c(arimaorder(auto.arima(r_vale))[1],arimaorder(auto.arima(r_vale))[3]),
+                                                 include.mean = F,
+                                                 variance.model = list(model = 'sGARCH',
+                                                                       garchOrder = c(1,1),
+                                                                       external.regressors = as.matrix(D8_R$SEG)),
+                                                 distribution = "norm"))
+tgarch_vale_seg <- ugarchfit(data = r_vale, spec = tgarch_vale_spec)                     
+tgarch_vale_seg@fit$robust.matcoef
+
+### PETR3 ###
+tgarch_petr_spec <- ugarchspec(mean.model = list(armaOrder = c(arimaorder(auto.arima(r_petr))[1],arimaorder(auto.arima(r_petr))[3]),
+                                                 include.mean = F,
+                                                 variance.model = list(model = 'sGARCH',
+                                                                       garchOrder = c(1,1),
+                                                                       external.regressors = as.matrix(D8_R$SEG)),
+                                                 distribution = "norm"))
+tgarch_petr_seg <- ugarchfit(data = r_petr, spec = tgarch_petr_spec)                     
+tgarch_petr_seg@fit$robust.matcoef
+
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 6: Volatilidade condicional maior na abertura e no fechamento -
+
+#### FOTOS DE COMO COLETAR DADOS HF 07/10 ###
+
+### VALE3 ###
+
+
+### PETR3 ###
+
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 7: Efeito alavancagem 
+### VALE3 ###
+egarch_vale_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(1,1)),
+                               distribution.model = "std" )
+egarch_vale <- ugarchfit(egarch_vale_spec, r_vale)
+egarch_vale@fit$robust.matcoef
+
+### PETR3 ###
+egarch_petr_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(0,0)),
+                               distribution.model = "std" )
+egarch_petr <- ugarchfit(egarch_petr_spec, r_petr)
+egarch_petr@fit$robust.matcoef
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 7: Efeito alavancagem 
+### VALE3 ###
+egarch_vale_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(1,1)),
+                               distribution.model = "std" )
+egarch_vale <- ugarchfit(egarch_vale_spec, r_vale)
+egarch_vale@fit$robust.matcoef
+
+### PETR3 ###
+egarch_petr_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(0,0)),
+                               distribution.model = "std" )
+egarch_petr <- ugarchfit(egarch_petr_spec, r_petr)
+egarch_petr@fit$robust.matcoef
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 7: Efeito alavancagem 
+### VALE3 ###
+egarch_vale_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(1,1)),
+                               distribution.model = "std" )
+egarch_vale <- ugarchfit(egarch_vale_spec, r_vale)
+egarch_vale@fit$robust.matcoef
+
+### PETR3 ###
+egarch_petr_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(0,0)),
+                               distribution.model = "std" )
+egarch_petr <- ugarchfit(egarch_petr_spec, r_petr)
+egarch_petr@fit$robust.matcoef
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 7: Efeito alavancagem 
+### VALE3 ###
+egarch_vale_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(1,1)),
+                               distribution.model = "std" )
+egarch_vale <- ugarchfit(egarch_vale_spec, r_vale)
+egarch_vale@fit$robust.matcoef
+
+### PETR3 ###
+egarch_petr_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(0,0)),
+                               distribution.model = "std" )
+egarch_petr <- ugarchfit(egarch_petr_spec, r_petr)
+egarch_petr@fit$robust.matcoef
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+
+# Fato 7: Efeito alavancagem 
+### VALE3 ###
+egarch_vale_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(1,1)),
+                               distribution.model = "std" )
+egarch_vale <- ugarchfit(egarch_vale_spec, r_vale)
+egarch_vale@fit$robust.matcoef
+
+### PETR3 ###
+egarch_petr_spec <- ugarchspec(variance.model = list(model="eGARCH", garchOrder=c(1,1)),
+                               mean.model = list(armaOrder=c(0,0)),
+                               distribution.model = "std" )
+egarch_petr <- ugarchfit(egarch_petr_spec, r_petr)
+egarch_petr@fit$robust.matcoef
+
+### MRVE3 ###
+
+
+### BBAS3 ###
+
+
+### ABEV3 ###
+
+
+### BOVA11 ###
+
+### P9 ###
+
+# BASE DE DADOS 
+
+library(readxl)
+D9 <- read_excel("D9 - E2.xlsx")
+names(D9) <- c('Data', 'IPCA', 'Desemprego', 'Exp.IPCA')
+D9$Data <- as.Date(D9$Data, format = "%Y-%m-%d")
+D9$IPCA <- ts(D9$IPCA, start = c(2002,1), end = c(2016,1), frequency = 12)
+D9$Desemprego <- ts(D9$Desemprego, start = c(2002,1), end = c(2016,1), frequency = 12)
+D9$`Exp.IPCA` <- ts(D9$`Exp.IPCA`, start = c(2002,1), end = c(2016,1), frequency = 12)
+
+desemprego <- D9$Desemprego
+ipca <- D9$IPCA
+expectativas <- D9$`Exp.IPCA`
+
+# GRAFICO DAS TRES SERIES 
+
+ts.plot(D9$IPCA, D9$Desemprego, D9$`Exp.IPCA`, col=1:3, ylab = "Pontos percentuais", xlab = "Tempo")
+legend("topright", colnames(D9[,2:4]), col = 1:3, cex = 0.8, fill = 1:6)
+
+# 1: CURVA DE PHILLIPS 
+
+# 1.1: OLS
+reg_1 <- lm(ipca ~ desemprego)
+summary(reg_1) 
+AIC(reg_1)
+BIC(reg_1)
+autoplot(ts(reg_1$residuals))
+acf(reg_1$residuals)
+pacf(reg_1$residuals)
+plot(desemprego,ipca)
+abline(reg_1)
+library(ggplot2)
+ggplot(data = D9, aes(x = desemprego, y = ipca)) + geom_line() + geom_abline(col = "red")
+arimaorder(auto.arima(reg_1$residuals))
+library(sandwich)
+nw_1 <- NeweyWest(reg_1)
+library(lmtest)
+coeftest(reg_1, vcov = nw_1)
+# 1.2: ARDL
+library(ARDL)
+auto_ardl_1<- auto_ardl(data = D9, IPCA ~ Desemprego, max_order = 5)
+auto_ardl_1
+auto_ardl_1$best_model$coefficients
+auto_ardl_1$best_model$order
+p1 <- arimaorder(auto.arima(reg_1$residuals))[1]
+q1 <- arimaorder(auto.arima(reg_1$residuals))[1]
+ardl_1 <- ardl(IPCA ~ Desemprego, D9, order = c(p1,q1))
+summary(ardl_1)
+multipliers(ardl_1) # De longo prazo
+autoplot(ardl_1$residuals)
+arimaorder(auto.arima(ardl_1$residuals))
+
+# 2: BACKWARD-LOOKING 
+
+### OMITINDO TAXA NATURAL DE DESEMPREGO ###
+
+# 2.1: OLS
+reg_2 <- lm(ipca ~ desemprego + lag(ipca))
+summary(reg_2)
+AIC(reg_2)
+BIC(reg_2)
+autoplot(ts(reg_2$residuals))
+acf(reg_2$residuals)
+pacf(reg_2$residuals)
+arimaorder(auto.arima(reg_2$residuals))
+nw_2 <- NeweyWest(reg_2)
+coeftest(reg_2, vcov = nw_2)
+# 2.2: Dynlm
+library(dynlm)
+dynlm_2 <- dynlm(ipca ~ desemprego + L(ipca))
+summary(dynlm_2)
+# 2.3: ARDL
+auto_ardl_2 <- auto_ardl(data = D9, IPCA ~ Desemprego, max_order = 5)
+summary(auto_ardl_2$best_model)
+auto_ardl_2$best_model$order
+p2 <- 2
+q2 <- 1
+ardl_2 <- ardl(IPCA ~ Desemprego, D9, order = c(p2,q2))
+summary(ardl_2)
+arimaorder(auto.arima(ardl_2$residuals))
+
+# 3: FORWARD-LOOKING 
+
+### OMITINDO TAXA NATURAL DE DESEMPREGO ###
+
+# 3.1: OLS
+reg_3 <- lm(ipca ~ desemprego + expectativas)
+summary(reg_3)
+AIC(reg_3)
+BIC(reg_3)
+autoplot(ts(reg_3$residuals))
+acf(reg_3$residuals)
+pacf(reg_3$residuals)
+arimaorder(auto.arima(reg_3$residuals))
+nw_3 <- NeweyWest(reg_3)
+coeftest(reg_3, vcov = nw_3)
+# 3.2: Dynlm
+dynlm_3 <- dynlm(ipca ~ desemprego + expectativas)
+summary(dynlm_3)
+# 3.3: ARDL
+auto_ardl_3 <- auto_ardl(data = D9, IPCA ~ Desemprego + Exp.IPCA, max_order = 5)
+summary(auto_ardl_3$best_model)
+auto_ardl_3$best_model$order
+p3 <- arimaorder(auto.arima(reg_3$residuals))[1]
+q3 <- arimaorder(auto.arima(reg_3$residuals))[1]
+ardl_3 <- ardl(IPCA ~ Desemprego, D9, order = c(p3,q3))
+summary(ardl_3)
+autoplot(ardl_3$residuals)
+arimaorder(auto.arima(ardl_3$residuals))
+
+### 4: CURVA DE PHILLIPS ACELERACIONISTA ###
+
+### OMITINDO TAXA NATURAL DE DESEMPREGO ###
+
+# 4.1: OLS
+reg_4 <- lm(ipca ~ desemprego + lag(expectativas))
+summary(reg_4)
+AIC(reg_4)
+BIC(reg_4)
+autoplot(ts(reg_4$residuals))
+acf(reg_4$residuals)
+pacf(reg_4$residuals)
+arimaorder(auto.arima(reg_4$residuals))
+nw_4 <- NeweyWest(reg_4)
+coeftest(reg_4, vcov = nw_4)
+# 4.2: Dynlm
+dynlm_4 <- dynlm(ipca ~ desemprego + L(expectativas))
+summary(dynlm_4)
+# 4.3: ARDL
+auto_ardl_4 <- auto_ardl(data = D9, IPCA ~ Desemprego + Exp.IPCA, max_order = 5)
+summary(auto_ardl_4$best_model)
+auto_ardl_4$best_model$order # Tem 3 numeros?
+p4 <- arimaorder(auto.arima(reg_4$residuals))[1]
+q4 <- arimaorder(auto.arima(reg_4$residuals))[1]
+ardl_4 <- ardl(IPCA ~ Desemprego, D9, order = c(p4,q4))
+summary(ardl_4)
+autoplot(ardl_4$residuals)
+arimaorder(auto.arima(ardl_4$residuals))
+
+# CURVA DE PHILLIPS NEW KEYNESIAN 
+
+### SEM DADOS DE HIATO DO PRODUTO ###
+
+# 5: CURVA DE PHILLIPS HIBRIDA (HPC)
+
+### OMITINDO O HIATO DO PRODUTO ###
+
+# 5.1: OLS
+reg_5 <- lm(ipca ~ lag(ipca) + expectativas)
+summary(reg_5)
+AIC(reg_5)
+BIC(reg_5)
+autoplot(ts(reg_5$residuals))
+acf(reg_5$residuals)
+pacf(reg_5$residuals)
+arimaorder(auto.arima(reg_5$residuals))
+nw_5 <- NeweyWest(reg_5)
+coeftest(reg_5, vcov = nw_5)
+# 5.2: Dynlm
+dynlm_5 <- dynlm(ipca ~ L(ipca) + expectativas)
+summary(dynlm_5)
+# 5.3: ARDL
+auto_ardl_5 <- auto_ardl(data = D9, IPCA ~  Exp.IPCA, max_order = 5)
+summary(auto_ardl_5$best_model)
+auto_ardl_5$best_model$order
+p5 <- 5
+q5 <- 5
+ardl_5 <- ardl(IPCA ~ Exp.IPCA, D9, order = c(p5,q5))
+summary(ardl_5)
+autoplot(ardl_5$residuals)
+arimaorder(auto.arima(ardl_5$residuals)) # Deve ter algum problema, deveriamos ter p = d = q = 0
+
+# 6: ENCOMPASSING PHILLIPS CURVE 
+
+### OMITINDO HIATO DO PRODUTO ###
+
+# 6.1: OLS
+reg_6 <- lm(diff(ipca) ~ lag(diff(ipca)) + lag(diff(ipca),2) + lag(ipca)[-1])
+summary(reg_6)
+AIC(reg_6)
+BIC(reg_6)
+autoplot(ts(reg_6$residuals))
+acf(reg_6$residuals)
+pacf(reg_6$residuals)
+arimaorder(auto.arima(reg_6$residuals))
+nw_6 <- NeweyWest(reg_6)
+coeftest(reg_6, vcov = nw_6)
+# 6.2: Dynlm
+dynlm_6 <- dynlm(diff(ipca) ~ L(diff(ipca)) + L(diff(ipca),2) + L(ipca))
+summary(dynlm_6)
+# 6.3: ARDL
+auto_ardl_6 <- auto_ardl(data = D9, diff(IPCA) ~ lag(diff(IPCA)) + lag(diff(IPCA),2) + lag(IPCA), max_order = 5)
+summary(auto_ardl_6$best_model) # O erro se deve ao fato de que auto_ardl() nao permite que usemos diff() e lag() dentro da funcao. Deveriamos criar uma tabela com as variaveis transformadas para entao rodarmos auto_ardl()
+auto_ardl_6$best_model$order
+p6 <- 5
+q6 <- 5
+ardl_6 <- ardl(IPCA ~ Exp.IPCA, D9, order = c(p6,q6))
+summary(ardl_6)
